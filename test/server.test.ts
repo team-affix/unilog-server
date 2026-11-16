@@ -32,12 +32,20 @@ async function publish(dir: string, node: KuboAdmin, ...extra: string[]): Promis
     }
 }
 
-/** What a user runs to push: ipfs pin remote add --service=home <cid>. */
+/**
+ * What a user runs to push: ipfs pin remote add --service=home <cid>. If the server refuses, the error also gives
+ * the reason the server recorded (ipfs reports only that it refused), so a failure says why.
+ */
 async function push(node: KuboAdmin, url: string, cid: string, token = 'none'): Promise<string> {
     const services = await ipfs(node, 'pin', 'remote', 'service', 'ls');
     if (!services.split('\n').some((l) => l.startsWith('home ')))
         await ipfs(node, 'pin', 'remote', 'service', 'add', 'home', url, token);
-    return ipfs(node, 'pin', 'remote', 'add', '--service=home', cid);
+    try {
+        return await ipfs(node, 'pin', 'remote', 'add', '--service=home', cid);
+    } catch (e) {
+        const reason = (await decision(url, cid).catch(() => undefined))?.info?.reason;
+        throw new Error(`${(e as Error).message}${reason ? `\nThe server's reason: ${reason}` : ''}`);
+    }
 }
 
 /** The server's recorded decision on a CID. */
