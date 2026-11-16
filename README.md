@@ -2,7 +2,7 @@
 
 An IPFS server which restricts uploads to DPM packages containing only valid unilog code.
 
-It is a standard **IPFS pinning service** in front of a Kubo node of its own. People push packages to it with Kubo's own command, `ipfs pin remote add`, and it keeps a package only if the package, and everything it depends on, checks with [Unilog](https://github.com/team-affix/unilog). Packages are [DPM](https://github.com/team-affix/apm) packages: folders identified by their IPFS CID, listing the CIDs they depend on in a `dpm.json`.
+It is a standard **IPFS pinning service** in front of a Kubo node of its own. People push packages to it with Kubo's own command, `ipfs pin remote add`, and it keeps a package only if the package, and everything it depends on, checks with [Unilog](https://github.com/team-affix/unilog). Packages are [DPM](https://github.com/team-affix/dpm) packages: folders identified by their IPFS CID, listing the CIDs they depend on in a `dpm.json`.
 
 ## What it does with a push
 
@@ -23,7 +23,7 @@ ipfs swarm peering add <an address the server printed>       # to fetch from it 
 
 ipfs add -r -Q "$(dpm pack)"                                 # publish your project: prints its CID
 ipfs pin remote add --service=home <cid>                     # push it: "Status: pinned", or refused
-dpm tree <cid> | xargs -n1 ipfs pin remote add --service=home   # push it with its whole tree
+dpm package tree <cid> --flat | xargs -n1 ipfs pin remote add --service=home   # push it with its whole tree
 ```
 
 `ipfs` reports only *that* a push was refused. The reason is in the server's API: `GET /pins?cid=<cid>&status=failed`, field `info.reason`.
@@ -64,7 +64,7 @@ Statuses go `queued`, then `pinning`, then `pinned` or `failed`. Each carries th
 ## How it fits together
 
 - **[Unilog](https://github.com/team-affix/unilog)** is the language. It knows nothing about DPM or servers.
-- **[DPM](https://github.com/team-affix/apm)** is the package manager: `dpm.json`, `dpm pack`, `dpm tree`, `dpm install`. It knows nothing about Unilog.
+- **[DPM](https://github.com/team-affix/dpm)** is the package manager: `dpm.json`, `dpm pack`, `dpm package tree`, `dpm install`. It knows nothing about Unilog.
 - **IPFS (Kubo)** stores, moves and verifies everything.
 - **This server** is the one piece that knows both: it uses DPM's library to fetch a package's tree, and Unilog's library to check it. Unilog's verdict is exactly `unilog check`'s, since it's the same code.
 
