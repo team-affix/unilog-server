@@ -121,16 +121,16 @@ import Logic.Prelude;
 # Nothing is both wrong and permitted.
 wrong_excludes_permitted : \X. wrong X => permitted X => false;
 EOF
-expect_ok "dpm add <Logic>" as bob dpm -C "$B" add "$LOGIC"
+expect_ok "dpm dep add <Logic>" as bob dpm -C "$B" dep add "$LOGIC"
 grep -q "$LOGIC" "$B/dpm.json" && pass "dpm.json lists the dependency" || fail "dpm.json"
 expect_ok "dpm install (Bob is peered only with the server)" as bob dpm -C "$B" install
 [ -f "$B/deps/$LOGIC/Logic/Prelude.ul" ] && pass "installed flat into deps/<cid>/" || fail "deps layout"
 expect_ok "unilog check passes with the dependency installed" bash -c "cd '$B' && unilog check"
-expect_ok "dpm ls" as bob dpm -C "$B" ls
+expect_ok "dpm tree draws the installed tree" as bob dpm -C "$B" tree
 ETHICS=$(publish bob "$B"); echo "        Ethics v1 = $ETHICS"
 expect_ok "Bob pushes Ethics; the server fetches its tree and checks it with Unilog" as bob ipfs pin remote add --service=home "$ETHICS"
 
-story "Carol builds on Bob's: a three-level tree, pushed whole with dpm tree"
+story "Carol builds on Bob's: a three-level tree, pushed whole with dpm package tree"
 C=$W/carol/kant; project carol "$C" Kant; mkdir -p "$C/Kant"
 cat > "$C/Kant/Beliefs.ul" <<'EOF'
 import Ethics.Core;
@@ -139,15 +139,15 @@ lying_is_wrong : \X. lies X => wrong X;
 lie_to_murderer : lies answering_the_murderer;
 wrong_to_lie : wrong answering_the_murderer = lying_is_wrong lie_to_murderer;
 EOF
-as carol dpm -C "$C" add "$ETHICS"
+as carol dpm -C "$C" dep add "$ETHICS"
 expect_ok "dpm install pulls Ethics and, through it, Logic" as carol dpm -C "$C" install
 [ "$(ls -d "$C"/deps/bafy* | wc -l)" = 2 ] && pass "both packages in deps/" || fail "deps count"
 expect_ok "unilog check passes" bash -c "cd '$C' && unilog check"
 KANT=$(publish carol "$C"); echo "        Kant v1 = $KANT"
-TREE=$(as carol dpm tree "$KANT")
-[ "$(wc -l <<<"$TREE")" = 3 ] && pass "dpm tree lists 3 CIDs (Kant, Ethics, Logic)" || fail "dpm tree: $TREE"
-expect_ok "push the whole tree: dpm tree | xargs -n1 ipfs pin remote add" \
-    as carol bash -c "dpm tree $KANT | xargs -n1 ipfs pin remote add --service=home"
+TREE=$(as carol dpm package tree "$KANT" --flat)
+[ "$(wc -l <<<"$TREE")" = 3 ] && pass "dpm package tree --flat lists 3 CIDs (Kant, Ethics, Logic)" || fail "dpm package tree: $TREE"
+expect_ok "push the whole tree: dpm package tree --flat | xargs -n1 ipfs pin remote add" \
+    as carol bash -c "dpm package tree $KANT --flat | xargs -n1 ipfs pin remote add --service=home"
 
 story "Dave pushes a package with a wrong proof: the server refuses it and doesn't keep it"
 D=$W/dave/bad; project dave "$D" Bad; mkdir -p "$D/Bad"
@@ -156,7 +156,7 @@ import Kant.Beliefs;
 # Wrong: lying_is_wrong lie_to_murderer proves "wrong answering_the_murderer", not "wrong everything".
 everything_is_wrong : \X. wrong X = lying_is_wrong lie_to_murderer;
 EOF
-as dave dpm -C "$D" add "$KANT"; as dave dpm -C "$D" install >/dev/null
+as dave dpm -C "$D" dep add "$KANT"; as dave dpm -C "$D" install >/dev/null
 expect_fail "unilog check fails locally" "wrong|does not|cannot|expected|error" bash -c "cd '$D' && unilog check"
 BAD=$(publish dave "$D")
 expect_fail "the server refuses it" "remote service failed to pin" as dave ipfs pin remote add --service=home "$BAD"
@@ -175,7 +175,7 @@ EOF
 expect_ok "unilog check" bash -c "cd '$A' && unilog check"
 LOGIC2=$(publish alice "$A"); echo "        Logic v2 = $LOGIC2"
 as alice ipfs pin remote add --service=home "$LOGIC2" >/dev/null && pass "Logic v2 pushed" || fail "push Logic v2"
-expect_ok "Bob: dpm remove old, dpm add new" as bob bash -c "dpm -C '$B' remove $LOGIC && dpm -C '$B' add $LOGIC2"
+expect_ok "Bob: dpm dep remove old, dpm dep add new" as bob bash -c "dpm -C '$B' dep remove $LOGIC && dpm -C '$B' dep add $LOGIC2"
 expect_ok "Bob: dpm install replaces Logic v1 with v2" as bob dpm -C "$B" install
 [ ! -e "$B/deps/$LOGIC" ] && [ -d "$B/deps/$LOGIC2" ] && pass "old version removed from deps/" || fail "stale deps"
 expect_ok "unilog check" bash -c "cd '$B' && unilog check"
@@ -183,10 +183,10 @@ ETHICS2=$(publish bob "$B"); as bob ipfs pin remote add --service=home "$ETHICS2
 NEW=$(comm -13 <(as bob ipfs refs -r -u "$ETHICS" | sort) <(as bob ipfs refs -r -u "$ETHICS2" | sort) | wc -l)
 echo "        Ethics v2 has $NEW blocks that v1 didn't have"
 [ "$NEW" -le 2 ] && pass "Ethics v2 shares every unchanged file with v1 (only dpm.json and the folder are new)" || fail "dedup: $NEW new blocks"
-as carol bash -c "dpm -C '$C' remove $ETHICS && dpm -C '$C' add $ETHICS2 && dpm -C '$C' install" >/dev/null
+as carol bash -c "dpm -C '$C' dep remove $ETHICS && dpm -C '$C' dep add $ETHICS2 && dpm -C '$C' install" >/dev/null
 expect_ok "Carol: unilog check with the new tree" bash -c "cd '$C' && unilog check"
 KANT2=$(publish carol "$C")
-expect_ok "Carol pushes Kant v2's tree" as carol bash -c "dpm tree $KANT2 | xargs -n1 ipfs pin remote add --service=home"
+expect_ok "Carol pushes Kant v2's tree" as carol bash -c "dpm package tree $KANT2 --flat | xargs -n1 ipfs pin remote add --service=home"
 
 story "The authors go offline: everything is still available from the server"
 for n in alice bob carol dave; do stop $n; done
@@ -197,15 +197,18 @@ import Logic.Prelude;
 # The reader's own conclusion, built on Kant's and Alice's packages.
 wrong_and_wrong : and (wrong answering_the_murderer) (wrong answering_the_murderer) = pair wrong_to_lie wrong_to_lie;
 EOF
-as reader dpm -C "$R" add "$KANT2" "$LOGIC2"
+as reader dpm -C "$R" dep add "$KANT2" "$LOGIC2"
 expect_ok "Reader: dpm install of a 3-package tree, only from the server" as reader dpm -C "$R" install
 expect_ok "Reader: unilog check of their own project, importing two packages" bash -c "cd '$R' && unilog check"
 [ "$(as reader ipfs pin ls --type=recursive | grep -c bafy)" = 0 ] && pass "install pinned nothing" || fail "install pinned something"
-expect_ok "Reader keeps what they checked: dpm tree | ipfs pin add (stdin, no xargs)" \
-    as reader bash -c "dpm tree $KANT2 | ipfs pin add"
+expect_ok "Reader keeps what they checked: dpm package tree --flat | ipfs pin add (stdin, no xargs)" \
+    as reader bash -c "dpm package tree $KANT2 --flat | ipfs pin add"
 [ "$(as reader ipfs pin ls --type=recursive | grep -cE "$KANT2|$ETHICS2|$LOGIC2")" = 3 ] && pass "all three are pinned" || fail "pins"
-expect_ok "dpm ls" as reader dpm -C "$R" ls
-as reader dpm -C "$R" ls | sed 's/^/        /'
+DIRECT=$(as reader dpm -C "$R" dep ls | sort | tr '\n' ' ')
+[ "$DIRECT" = "$(printf '%s\n' "$KANT2" "$LOGIC2" | sort | tr '\n' ' ')" ] && pass "dpm dep ls lists only the 2 direct dependencies" || fail "dpm dep ls: $DIRECT"
+[ "$(as reader dpm -C "$R" tree --flat | wc -l)" = 3 ] && pass "dpm tree --flat lists all 3 installed packages" || fail "dpm tree --flat"
+expect_ok "dpm tree draws the installed tree" as reader dpm -C "$R" tree
+as reader dpm -C "$R" tree | sed 's/^/        /'
 
 story "Reader opens Carol's package to work on it: ipfs get, then dpm install"
 expect_ok "ipfs get <Kant v2> -o kant-work" as reader ipfs get "$KANT2" -o "$W/reader/kant-work"
@@ -219,7 +222,7 @@ EVE=$(publish eve "$E")
 expect_ok "Eve publishes and pushes her own Logic.Prelude" as eve ipfs pin remote add --service=home "$EVE"
 X=$W/reader/clash; project reader "$X" App; mkdir -p "$X/App"
 printf 'import Logic.Prelude;\nx : \\C. false => C = false_elim;\n' > "$X/App/Main.ul"
-as reader dpm -C "$X" add "$LOGIC2" "$EVE"
+as reader dpm -C "$X" dep add "$LOGIC2" "$EVE"
 expect_ok "dpm install installs both" as reader dpm -C "$X" install
 expect_fail "unilog check reports the ambiguous module" "ambiguous" bash -c "cd '$X' && unilog check"
 
@@ -232,18 +235,18 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H 'Authorization: Beare
 [ "$CODE" = 405 ] && pass "removing straight through the server's API, with a valid token, is refused too (405)" || fail "DELETE returned $CODE"
 
 story "Errors users can hit"
-expect_fail "dpm add with something that isn't a CID" "Not a CID" as reader dpm -C "$R" add Kant
-expect_fail "dpm remove of something that isn't a dependency" "Not a dependency" as reader dpm -C "$R" remove "$EVE"
+expect_fail "dpm dep add with something that isn't a CID" "Not a CID" as reader dpm -C "$R" dep add Kant
+expect_fail "dpm dep remove of something that isn't a dependency" "Not a dependency" as reader dpm -C "$R" dep remove "$EVE"
 mkdir -p "$W/reader/nodpm"; echo x > "$W/reader/nodpm/f.ul"
 expect_fail "dpm pack without dpm.json" "not a DPM project" as reader dpm -C "$W/reader/nodpm" pack
 NOTPKG=$(as reader ipfs add -r -Q "$W/reader/nodpm")
-Y=$W/reader/notpkg; project reader "$Y" App; as reader dpm -C "$Y" add "$NOTPKG"
+Y=$W/reader/notpkg; project reader "$Y" App; as reader dpm -C "$Y" dep add "$NOTPKG"
 expect_fail "a dependency that isn't a DPM package" "not a DPM package" as reader dpm -C "$Y" install
 GONE=$(as reader ipfs add -r -Q --only-hash "$(as reader dpm -C "$Y" pack)")
-Z=$W/reader/missing; project reader "$Z" App; as reader dpm -C "$Z" add "$GONE"
+Z=$W/reader/missing; project reader "$Z" App; as reader dpm -C "$Z" dep add "$GONE"
 expect_fail "a dependency nobody has (dpm install --timeout 5s)" "Could not fetch $GONE" as reader dpm -C "$Z" install --timeout 5s
-expect_fail "dpm tree of it prints nothing and fails" "Could not fetch" as reader dpm tree "$GONE" --timeout 5s
-expect_fail "dpm with no Kubo reachable" "Cannot reach the IPFS node" as reader env DPM_KUBO_API=http://127.0.0.1:1 dpm tree "$KANT2"
+expect_fail "dpm package tree of it prints nothing and fails" "Could not fetch" as reader dpm package tree "$GONE" --flat --timeout 5s
+expect_fail "dpm with no Kubo reachable" "Cannot reach the IPFS node" as reader env DPM_KUBO_API=http://127.0.0.1:1 dpm package tree "$KANT2" --flat
 
 story "Optional: a reader with no Kubo running, reading through a remote Kubo with a read-only token"
 kubo_node remote $((P+8)) $((P+108))
@@ -256,8 +259,8 @@ L=$W/lite/app; mkdir -p "$L"
 lite() { IPFS_PATH=$W/lite/no-kubo-here DPM_HOME=$W/home/lite "$@"; }
 lite dpm -C "$L" init >/dev/null; (cd "$L" && unilog init --roots . 'deps/*' --check App >/dev/null); mkdir -p "$L/App"
 printf 'import Kant.Beliefs;\nmine : wrong answering_the_murderer = wrong_to_lie;\n' > "$L/App/Main.ul"
-lite dpm -C "$L" add "$KANT2"
-expect_ok "dpm node --set <remote> --auth bearer:<read token>" lite dpm node --set http://127.0.0.1:$((P+8)) --auth bearer:read
+lite dpm -C "$L" dep add "$KANT2"
+expect_ok "dpm node set <remote> bearer:<read token>" lite dpm node set http://127.0.0.1:$((P+8)) bearer:read
 expect_ok "dpm install through the remote Kubo" lite dpm -C "$L" install
 expect_ok "unilog check" bash -c "cd '$L' && unilog check"
 [ ! -e "$W/lite/no-kubo-here" ] && pass "no Kubo repo was ever created on the reader's side" || fail "a local repo appeared"
