@@ -44,7 +44,7 @@ KUBO_API=http://127.0.0.1:5001 PORT=3000 unilog-server
 | `ANNOUNCE` | Comma-separated multiaddrs of the server's node, for clients to peer with (default: the node's own) |
 | `KEEP_DEPS` | `1`: pin each package's dependencies too. By default only what was pushed is pinned; the dependencies are fetched and checked, but stay only as cached data, as with anything a Kubo node fetches. |
 
-At startup it prints how to push to it and the addresses to peer with.
+At startup it prints how to push to it, and the addresses others can peer with: only public, direct ones (not local, private or relayed ones). If the node has none, as behind NAT, set `ANNOUNCE` to its public address. It also warns when anyone who can reach its port can push (no `TOKENS`, listening on all interfaces), and when it uses the default local Kubo, which is likely your own node. `unilog-server --help` lists the settings, and `unilog-server --version` prints the version; it takes no other arguments.
 
 Give the server a Kubo node of its own: after a refusal it garbage-collects the node, which deletes anything unpinned. Expose the server's port and Kubo's peer-to-peer port (4001), never Kubo's HTTP API (5001). `docker compose up` runs both (see `docker-compose.yml`).
 
@@ -92,7 +92,7 @@ npm run build
 npm run bundle    # single-file unilog-server in release/
 ```
 
-`npm run test:e2e` runs 67 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. It runs in CI too. To try it against an unreleased Unilog, point it at a built checkout with `UNILOG_DIR=<path>`.
+`npm run test:e2e` runs 71 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. It runs in CI too. To try it against an unreleased Unilog, point it at a built checkout with `UNILOG_DIR=<path>`.
 
 Layout:
 

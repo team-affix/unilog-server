@@ -69,10 +69,19 @@ for n in alice bob carol dave eve reader server; do
 done
 
 story "Server operator: unilog-server with its own Kubo, checking every package with Unilog, tokens required"
+expect_ok "unilog-server --version prints the version and starts nothing" bash -c \
+    "[ \"\$(unilog-server --version)\" = \"$(node -p "require('$REPO/package.json').version")\" ]"
+expect_ok "unilog-server --help lists its settings" bash -c "unilog-server --help | grep -q KUBO_API"
+expect_fail "unilog-server refuses an argument it doesn't know, and starts nothing" "takes no arguments" \
+    unilog-server --port 3000
+# Every node here is on this machine, so none has an address others could reach: as on a server behind NAT,
+# the operator announces the address to peer with.
+SERVER_ID=$(as server ipfs id -f '<id>')
 KUBO_API=http://127.0.0.1:${API[server]} PORT=$SRV DATA_DIR=$W/server-data TOKENS=letmein \
-    unilog-server >"$W/server.log" 2>&1 &
+    ANNOUNCE=/ip4/127.0.0.1/tcp/$((P+107))/p2p/$SERVER_ID unilog-server >"$W/server.log" 2>&1 &
 PIDS+=($!); sleep 3
 cat "$W/server.log" | sed 's/^/        /'
+grep -q WARNING "$W/server.log" && fail "warnings, though it has a token and its own Kubo" || pass "no warnings: it needs a token and has its own Kubo"
 PEER=$(grep "swarm peering add" "$W/server.log" | head -1 | awk '{print $NF}')
 [ -n "$PEER" ] && pass "server prints the address to peer with" || fail "server printed no peering address"
 
