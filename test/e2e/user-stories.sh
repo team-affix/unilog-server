@@ -4,8 +4,7 @@
 #
 # Needs:
 #   ipfs     Kubo's command: on the PATH, or IPFS_BIN=/path/to/ipfs
-#   unilog   the one installed with this repo (node_modules), or UNILOG_DIR=/path/to/a/built/unilog/checkout.
-#            Users' projects use "roots": [".", "deps/*"], which needs Unilog 0.3.2 or later.
+#   unilog   the one installed with this repo (node_modules), or UNILOG_DIR=/path/to/a/built/unilog/checkout
 #   ports    E2E_PORT (default 6100) up to E2E_PORT+300 must be free
 #
 # Each person has their own Kubo node, isolated (Kubo's test profile: no bootstrap, no discovery), so nodes only
