@@ -31,6 +31,7 @@ dpm tree <cid> | xargs -n1 ipfs pin remote add --service=home   # push it with i
 ## Running a server
 
 ```bash
+npm install -g https://github.com/team-affix/unilog-server/releases/latest/download/unilog-server.tgz   # Node.js 20+
 KUBO_API=http://127.0.0.1:5001 PORT=3000 unilog-server
 ```
 
@@ -75,6 +76,8 @@ Built files are never committed. They are attached to [GitHub Releases](https://
 |---|---|
 | `unilog-server-<version>.cjs` | the server as a single file: `node unilog-server-<version>.cjs` |
 | `team-affix-unilog-server-<version>.tgz` | the npm package: `npm i -g ./team-affix-unilog-server-<version>.tgz` |
+
+Each release also has the same files without the version in their names (`unilog-server.cjs`, `unilog-server.tgz`), so `https://github.com/team-affix/unilog-server/releases/latest/download/<name>` always gets the newest.
 
 To release: set a new version in `package.json` and merge to `main`. After the tests pass, CI tags the merge commit `v<version>` and publishes the release.
 
