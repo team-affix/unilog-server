@@ -89,7 +89,7 @@ npm run build
 npm run bundle    # single-file unilog-server in release/
 ```
 
-`npm run test:e2e` runs 67 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. Users' projects in it use `"roots": [".", "deps/*"]`, which needs Unilog 0.3.2 or later; until that's released, point it at a newer Unilog checkout with `UNILOG_DIR=<path>`.
+`npm run test:e2e` runs 67 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. It runs in CI too. To try it against an unreleased Unilog, point it at a built checkout with `UNILOG_DIR=<path>`.
 
 Layout:
 

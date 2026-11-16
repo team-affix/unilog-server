@@ -1,6 +1,6 @@
 {
     "name": "@team-affix/unilog-server",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "A server that keeps Unilog packages: an IPFS pinning service that pins a package only if it and its dependencies check with Unilog.",
     "license": "MIT",
     "author": "Team Affix",
@@ -27,8 +27,8 @@
         "bundle": "esbuild src/main.ts --bundle --platform=node --target=node20 --outfile=release/unilog-server.cjs"
     },
     "dependencies": {
-        "@team-affix/dpm": "https://github.com/team-affix/apm/releases/download/v0.2.0/team-affix-dpm-0.2.0.tgz",
-        "@team-affix/unilog": "https://github.com/team-affix/unilog/releases/download/v0.3.1/team-affix-unilog-0.3.1.tgz"
+        "@team-affix/dpm": "https://github.com/team-affix/apm/releases/download/v0.3.0/team-affix-dpm-0.3.0.tgz",
+        "@team-affix/unilog": "https://github.com/team-affix/unilog/releases/download/v0.3.2/team-affix-unilog-0.3.2.tgz"
     },
     "devDependencies": {
         "@eslint/js": "^9.32.0",

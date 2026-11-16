@@ -41,6 +41,10 @@ jobs:
         env:
           REQUIRE_IPFS: '1'
       - run: npm run build
+      # Every user story, end to end: 8 Kubo nodes, this server, and the dpm and unilog commands. Once is enough.
+      - name: End-to-end user stories
+        if: matrix.node == 22
+        run: bash test/e2e/user-stories.sh
 
   # Publishes a GitHub Release with unilog-server, after the tests pass. Runs when:
   # - main is pushed (e.g. a PR is merged) and its package version has no release yet: tags that commit
