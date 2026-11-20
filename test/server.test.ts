@@ -1,6 +1,5 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import fs from 'fs';
 import { describe, expect, it } from 'vitest';
 import { writeManifest } from '@team-affix/dpm';
 import { pack } from '@team-affix/dpm/client';
@@ -22,15 +21,8 @@ async function ipfs(node: KuboAdmin, ...args: string[]): Promise<string> {
     return stdout.trim();
 }
 
-/** What a user runs to publish: ipfs add -r -Q "$(dpm pack)". `extra` e.g. --only-hash. Returns the CID. */
-async function publish(dir: string, node: KuboAdmin, ...extra: string[]): Promise<string> {
-    const folder = pack(dir);
-    try {
-        return await ipfs(node, 'add', '-r', '-Q', ...extra, folder);
-    } finally {
-        fs.rmSync(folder, { recursive: true });
-    }
-}
+/** What a user runs to publish: dpm pack. Returns the CID. */
+const publish = (dir: string, node: KuboAdmin): Promise<string> => pack(dir, node);
 
 /**
  * What a user runs to push: ipfs pin remote add --service=home <cid>. If the server refuses, the error also gives
@@ -159,7 +151,14 @@ describe.skipIf(!IPFS_BIN)('Unilog server (real Kubo nodes)', { timeout: 60_000 
 
         it('refuses a package whose tree cannot be completed', async () => {
             const { author, url } = await world();
-            const missing = await publish(project({ 'Nowhere/X.ul': 'gone : p;\n' }), author, '--only-hash');
+            const missing = await ipfs(
+                author,
+                'add',
+                '-r',
+                '-Q',
+                '--only-hash',
+                project({ 'Nowhere/X.ul': 'gone : p;\n' }),
+            );
             const cid = await publish(project(LOGIC, [missing]), author);
             await expect(push(author, url, cid)).rejects.toThrow(REFUSED);
             expect((await decision(url, cid))?.info?.reason).toContain(`Could not fetch ${missing}`);

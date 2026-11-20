@@ -79,7 +79,7 @@ export async function startNode(
     if (!IPFS_BIN) throw new Error('no ipfs binary');
     const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'unilog-server-kubo-'));
     const env = { ...process.env, IPFS_PATH: repo };
-    execFileSync(IPFS_BIN, ['init', '--profile=test,unixfs-v1-2025'], { env, stdio: 'ignore' });
+    execFileSync(IPFS_BIN, ['init', '--profile=test'], { env, stdio: 'ignore' });
     if (opts.authorizations)
         execFileSync(IPFS_BIN, ['config', '--json', 'API.Authorizations', JSON.stringify(opts.authorizations)], {
             env,
