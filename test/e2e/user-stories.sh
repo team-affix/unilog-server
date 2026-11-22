@@ -41,7 +41,7 @@ story() { echo; echo "== $1"; }
 declare -A API
 kubo_node() { # name apiport swarmport
     export IPFS_PATH=$W/kubo/$1
-    ipfs init --profile=test,unixfs-v1-2025 >/dev/null
+    ipfs init --profile=test >/dev/null
     ipfs config Addresses.API /ip4/127.0.0.1/tcp/$2
     ipfs config Addresses.Gateway /ip4/127.0.0.1/tcp/$(( $2 + 200 ))
     ipfs config --json Addresses.Swarm "[\"/ip4/127.0.0.1/tcp/$3\"]"
@@ -97,7 +97,7 @@ project() { # who dir checkfolder
     as $1 dpm -C "$2" init >/dev/null
     (cd "$2" && unilog init --roots . 'deps/*' --check "$3" >/dev/null)
 }
-publish() { as $1 ipfs add -r -Q "$(as $1 dpm -C "$2" pack)"; }
+publish() { as $1 dpm -C "$2" pack; }
 
 story "Alice publishes a logic package (no dependencies) and pushes it"
 A=$W/alice/logic; project alice "$A" Logic; mkdir -p "$A/Logic"
@@ -109,9 +109,10 @@ fst : \A B. and A B => A;
 EOF
 expect_ok "unilog check passes on Alice's project" bash -c "cd '$A' && unilog check"
 LOGIC=$(publish alice "$A"); echo "        Logic v1 = $LOGIC"
-[[ $LOGIC == bafy* ]] && pass "dpm pack + ipfs add gives a CID" || fail "no CID: $LOGIC"
-PACKED=$(as alice dpm -C "$A" pack); [[ $(basename "$PACKED") =~ ^[0-9a-f-]{36}$ ]] && pass "dpm pack names its folder by a GUID ($(basename "$PACKED"))" || fail "pack folder: $PACKED"
-[ ! -e "$PACKED/deps" ] && [ -f "$PACKED/dpm.json" ] && pass "packed folder has dpm.json and no deps/" || fail "packed folder contents"
+[[ $LOGIC == bafy* ]] && pass "dpm pack prints a CID" || fail "no CID: $LOGIC"
+as alice ipfs pin ls --type=recursive "$LOGIC" >/dev/null 2>&1 && pass "dpm pack pinned it in Alice's Kubo" || fail "not pinned: $LOGIC"
+[ "$(as alice dpm -C "$A" pack)" = "$LOGIC" ] && pass "packing again gives the same CID" || fail "pack is not deterministic"
+mkdir -p "$A/deps/junk" "$A/.hidden"; [ "$(as alice dpm -C "$A" pack)" = "$LOGIC" ] && pass "deps/ and hidden files are not part of the package" || fail "pack included deps/ or hidden files"; rm -rf "$A/deps" "$A/.hidden"
 expect_ok "Alice pushes Logic: ipfs pin remote add" as alice ipfs pin remote add --service=home "$LOGIC"
 
 story "Bob builds on Alice's package: dpm add, dpm install (from the server), unilog check, publish, push"
@@ -175,7 +176,7 @@ EOF
 expect_ok "unilog check" bash -c "cd '$A' && unilog check"
 LOGIC2=$(publish alice "$A"); echo "        Logic v2 = $LOGIC2"
 as alice ipfs pin remote add --service=home "$LOGIC2" >/dev/null && pass "Logic v2 pushed" || fail "push Logic v2"
-expect_ok "Bob: dpm dep remove old, dpm dep add new" as bob bash -c "dpm -C '$B' dep remove $LOGIC && dpm -C '$B' dep add $LOGIC2"
+expect_ok "Bob: dpm dep rm old, dpm dep add new" as bob bash -c "dpm -C '$B' dep rm $LOGIC && dpm -C '$B' dep add $LOGIC2"
 expect_ok "Bob: dpm install replaces Logic v1 with v2" as bob dpm -C "$B" install
 [ ! -e "$B/deps/$LOGIC" ] && [ -d "$B/deps/$LOGIC2" ] && pass "old version removed from deps/" || fail "stale deps"
 expect_ok "unilog check" bash -c "cd '$B' && unilog check"
@@ -183,7 +184,7 @@ ETHICS2=$(publish bob "$B"); as bob ipfs pin remote add --service=home "$ETHICS2
 NEW=$(comm -13 <(as bob ipfs refs -r -u "$ETHICS" | sort) <(as bob ipfs refs -r -u "$ETHICS2" | sort) | wc -l)
 echo "        Ethics v2 has $NEW blocks that v1 didn't have"
 [ "$NEW" -le 2 ] && pass "Ethics v2 shares every unchanged file with v1 (only dpm.json and the folder are new)" || fail "dedup: $NEW new blocks"
-as carol bash -c "dpm -C '$C' dep remove $ETHICS && dpm -C '$C' dep add $ETHICS2 && dpm -C '$C' install" >/dev/null
+as carol bash -c "dpm -C '$C' dep rm $ETHICS && dpm -C '$C' dep add $ETHICS2 && dpm -C '$C' install" >/dev/null
 expect_ok "Carol: unilog check with the new tree" bash -c "cd '$C' && unilog check"
 KANT2=$(publish carol "$C")
 expect_ok "Carol pushes Kant v2's tree" as carol bash -c "dpm package tree $KANT2 --flat | xargs -n1 ipfs pin remote add --service=home"
@@ -236,13 +237,13 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H 'Authorization: Beare
 
 story "Errors users can hit"
 expect_fail "dpm dep add with something that isn't a CID" "Not a CID" as reader dpm -C "$R" dep add Kant
-expect_fail "dpm dep remove of something that isn't a dependency" "Not a dependency" as reader dpm -C "$R" dep remove "$EVE"
+expect_fail "dpm dep rm of something that isn't a dependency" "Not a dependency" as reader dpm -C "$R" dep rm "$EVE"
 mkdir -p "$W/reader/nodpm"; echo x > "$W/reader/nodpm/f.ul"
 expect_fail "dpm pack without dpm.json" "not a DPM project" as reader dpm -C "$W/reader/nodpm" pack
 NOTPKG=$(as reader ipfs add -r -Q "$W/reader/nodpm")
 Y=$W/reader/notpkg; project reader "$Y" App; as reader dpm -C "$Y" dep add "$NOTPKG"
 expect_fail "a dependency that isn't a DPM package" "not a DPM package" as reader dpm -C "$Y" install
-GONE=$(as reader ipfs add -r -Q --only-hash "$(as reader dpm -C "$Y" pack)")
+GONE=$(as reader ipfs add -r -Q --only-hash "$Y")   # a package's CID, never added anywhere
 Z=$W/reader/missing; project reader "$Z" App; as reader dpm -C "$Z" dep add "$GONE"
 expect_fail "a dependency nobody has (dpm install --timeout 5s)" "Could not fetch $GONE" as reader dpm -C "$Z" install --timeout 5s
 expect_fail "dpm package tree of it prints nothing and fails" "Could not fetch" as reader dpm package tree "$GONE" --flat --timeout 5s

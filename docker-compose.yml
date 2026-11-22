@@ -4,7 +4,7 @@ services:
   kubo:
     image: ipfs/kubo:v0.43.1
     environment:
-      IPFS_PROFILE: server,unixfs-v1-2025
+      IPFS_PROFILE: server
     volumes:
       - ipfs:/data/ipfs
     ports:

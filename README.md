@@ -15,13 +15,13 @@ Since a CID fixes its whole tree, a package the server keeps has been checked ex
 
 ## Using a server
 
-With [Kubo](https://github.com/ipfs/kubo/releases) running on your machine (`ipfs init --profile=unixfs-v1-2025` once, then `ipfs daemon`):
+With [Kubo](https://github.com/ipfs/kubo/releases) running on your machine (`ipfs init` once, then `ipfs daemon`):
 
 ```bash
 ipfs pin remote service add home https://<server> <token>   # once (any token if the server needs none)
 ipfs swarm peering add <an address the server printed>       # to fetch from it (or Peering.Peers in Kubo's config)
 
-ipfs add -r -Q "$(dpm pack)"                                 # publish your project: prints its CID
+dpm pack                                                     # create your package, add it to your Kubo: prints its CID
 ipfs pin remote add --service=home <cid>                     # push it: "Status: pinned", or refused
 dpm package tree <cid> --flat | xargs -n1 ipfs pin remote add --service=home   # push it with its whole tree
 ```
@@ -92,7 +92,7 @@ npm run build
 npm run bundle    # single-file unilog-server in release/
 ```
 
-`npm run test:e2e` runs 71 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. It runs in CI too. To try it against an unreleased Unilog, point it at a built checkout with `UNILOG_DIR=<path>`.
+`npm run test:e2e` runs 74 checks, covering: publishing and pushing, installing from the server with the authors offline, a three-level tree, a refused wrong proof, version propagation, pinning a tree, opening a package with `ipfs get`, two packages with the same module, refused removal, the errors users can hit, and reading through a remote Kubo. It runs in CI too. To try it against an unreleased Unilog, point it at a built checkout with `UNILOG_DIR=<path>`.
 
 Layout:
 
